@@ -615,13 +615,35 @@ export const transferToBulk = async (req, res, next) => {
   }
 };
 
+// Alias functions to match route expectations
+const startCampaign = async (req, res, next) => {
+  // Start campaign by updating status to 'processing'
+  req.body = { status: 'processing' };
+  return updateCampaignStatus(req, res, next);
+};
+
+const pauseCampaign = async (req, res, next) => {
+  // Pause campaign by updating status to 'paused'
+  req.body = { status: 'paused' };
+  return updateCampaignStatus(req, res, next);
+};
+
+const getCampaignNumbers = getVerificationResults;
+const getCampaignResults = getVerificationResults;
+const exportCampaignNumbers = exportValidNumbers;
+
 export default {
   getCampaigns,
   getCampaign,
   createCampaign,
   updateCampaignStatus,
+  startCampaign,
+  pauseCampaign,
+  getCampaignNumbers,
+  getCampaignResults,
   getVerificationResults,
   verifyPhoneNumber,
   exportValidNumbers,
+  exportCampaignNumbers,
   transferToBulk
 };

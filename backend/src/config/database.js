@@ -3,37 +3,52 @@ import { config } from './config.js';
 import logger from '../utils/logger.js';
 
 // Create Sequelize instance
+const sequelizeOptions = {
+  dialect: config.database.dialect,
+  logging: config.database.logging ? (msg) => logger.debug(msg) : false,
+  pool: {
+    max: config.database.pool.max,
+    min: config.database.pool.min,
+    acquire: config.database.pool.acquire,
+    idle: config.database.pool.idle
+  },
+  define: {
+    timestamps: true,
+    underscored: false,
+    freezeTableName: false,
+    charset: 'utf8mb4',
+    dialectOptions: {
+      collate: 'utf8mb4_unicode_ci'
+    }
+  }
+};
+
+// Add host configuration (support for Unix socket or TCP)
+if (config.database.host.startsWith('/')) {
+  // Unix socket connection
+  sequelizeOptions.host = config.database.host;
+} else {
+  // TCP connection
+  sequelizeOptions.host = config.database.host;
+  sequelizeOptions.port = config.database.port;
+}
+
+// Add SSL if needed
+if (config.database.ssl) {
+  sequelizeOptions.dialectOptions = {
+    ...sequelizeOptions.dialectOptions,
+    ssl: {
+      require: true,
+      rejectUnauthorized: false
+    }
+  };
+}
+
 const sequelize = new Sequelize(
   config.database.database,
   config.database.username,
   config.database.password,
-  {
-    host: config.database.host,
-    port: config.database.port,
-    dialect: config.database.dialect,
-    logging: config.database.logging ? (msg) => logger.debug(msg) : false,
-    dialectOptions: {
-      ssl: config.database.ssl ? {
-        require: true,
-        rejectUnauthorized: false
-      } : false
-    },
-    pool: {
-      max: config.database.pool.max,
-      min: config.database.pool.min,
-      acquire: config.database.pool.acquire,
-      idle: config.database.pool.idle
-    },
-    define: {
-      timestamps: true,
-      underscored: false,
-      freezeTableName: false,
-      charset: 'utf8mb4',
-      dialectOptions: {
-        collate: 'utf8mb4_unicode_ci'
-      }
-    }
-  }
+  sequelizeOptions
 );
 
 /**
