@@ -12,6 +12,46 @@ const CACHE_TTL = {
   NUMBER_EXISTS: 86400, // 24 hours
 };
 
+// Rate limiting configuration
+const rateLimitStore = new Map();
+const RATE_LIMIT_CONFIG = {
+  maxRequests: 100,
+  windowMs: 60000 // 1 minute
+};
+
+/**
+ * Check rate limit for a given key (URL)
+ * @param {string} key - The key to check rate limit for
+ * @returns {Object} - Rate limit status
+ */
+const checkRateLimit = async (key) => {
+  const now = Date.now();
+  const windowStart = now - RATE_LIMIT_CONFIG.windowMs;
+
+  // Get or create rate limit entry
+  let rateLimit = rateLimitStore.get(key);
+
+  if (!rateLimit) {
+    rateLimit = { requests: [], resetTime: now + RATE_LIMIT_CONFIG.windowMs };
+    rateLimitStore.set(key, rateLimit);
+  }
+
+  // Remove old requests outside the time window
+  rateLimit.requests = rateLimit.requests.filter(timestamp => timestamp > windowStart);
+
+  // Add current request
+  rateLimit.requests.push(now);
+
+  // Calculate remaining requests
+  const remaining = RATE_LIMIT_CONFIG.maxRequests - rateLimit.requests.length;
+
+  return {
+    remaining: Math.max(0, remaining),
+    resetTime: rateLimit.resetTime,
+    total: RATE_LIMIT_CONFIG.maxRequests
+  };
+};
+
 // Create axios instance with enhanced configuration
 const apiClient = axios.create({
   baseURL: config.evolutionApi.baseUrl,

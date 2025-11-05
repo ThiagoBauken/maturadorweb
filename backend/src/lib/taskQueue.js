@@ -2,7 +2,6 @@ import { createClient } from 'redis';
 import { config } from '../config/config.js';
 import logger from '../utils/logger.js';
 import { Semaphore } from 'async-mutex';
-import sql from '../database/db.js';
 
 // Singleton instance of the task queue
 let redisClient;
@@ -389,20 +388,25 @@ function updateCircuitBreaker(instance, success) {
   circuitBreakerStates.set(instance, state);
 }
 
-// Initialize session instances from config
+// Initialize session instances from database
 async function initializeSessionRotation() {
   try {
-    const { rows } = await sql`
-      SELECT instance_name, capabilities
-      FROM whatsapp_instances
-      WHERE status = 'connected'
-    `;
+    // Import Session model to get connected instances
+    const { Session } = await import('../models/index.js');
 
-    sessionRotation.instances = rows;
-    logger.info(`Initialized ${rows.length} WhatsApp instances`);
+    const sessions = await Session.findAll({
+      where: { status: 'connected' }
+    });
+
+    sessionRotation.instances = sessions.map(session => ({
+      instanceName: session.instanceName,
+      capabilities: ['verification', 'bulkSend', 'warming']
+    }));
+
+    logger.info(`Initialized ${sessionRotation.instances.length} WhatsApp instances`);
   } catch (error) {
     logger.error('Failed to initialize session rotation:', error);
-    throw error;
+    // Don't throw - allow system to start without sessions
   }
 }
 
@@ -411,6 +415,6 @@ setInterval(() => {
   initializeSessionRotation().catch(error =>
     logger.error('Session rotation refresh failed:', error)
   );
-}, config.sessionRotation.refreshInterval || 30000);
+}, 30000); // 30 seconds
 
 export { taskHandlers };

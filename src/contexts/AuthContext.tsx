@@ -29,9 +29,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     // Check if token exists in localStorage on initial load
-    const storedToken = localStorage.getItem('whatsapp_token');
+    const storedToken = localStorage.getItem('authToken');
     const storedUser = localStorage.getItem('whatsapp_user');
-    
+
     try {
       if (storedToken && storedUser) {
         setToken(storedToken);
@@ -40,7 +40,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (error) {
       console.error("Error parsing stored user:", error);
       // If there's an error parsing the user, clear the storage
-      localStorage.removeItem('whatsapp_token');
+      localStorage.removeItem('authToken');
       localStorage.removeItem('whatsapp_user');
     } finally {
       // Ensure we set isLoading to false after checking storage
@@ -51,33 +51,40 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const login = async (email: string, password: string) => {
     try {
       setIsLoading(true);
-      
-      // This would be replaced with an actual API call
-      // For demo purposes, we set admin role based on email
-      const isAdmin = email.includes('admin');
-      
-      const mockUser = {
-        id: '1',
-        name: isAdmin ? 'Admin User' : 'Regular User',
-        email: email,
-        role: isAdmin ? 'admin' : 'user'
-      };
-      
-      const mockToken = 'mock-jwt-token';
-      
-      // Store in localStorage
-      localStorage.setItem('whatsapp_token', mockToken);
-      localStorage.setItem('whatsapp_user', JSON.stringify(mockUser));
-      
+
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+
+      // Call the real backend API
+      const response = await fetch(`${API_URL}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email, password })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Login failed');
+      }
+
+      const { token, user: userData } = data.data;
+
+      // Store in localStorage with consistent key name
+      localStorage.setItem('authToken', token);
+      localStorage.setItem('whatsapp_user', JSON.stringify(userData));
+
       // Update state
-      setToken(mockToken);
-      setUser(mockUser);
-      
+      setToken(token);
+      setUser(userData);
+
       toast.success('Login successful!');
       navigate('/dashboard');
     } catch (error) {
       console.error('Login failed:', error);
-      toast.error('Login failed. Please check your credentials.');
+      const errorMessage = error instanceof Error ? error.message : 'Login failed. Please check your credentials.';
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -85,13 +92,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const logout = () => {
     // Clear localStorage
-    localStorage.removeItem('whatsapp_token');
+    localStorage.removeItem('authToken');
     localStorage.removeItem('whatsapp_user');
-    
+
     // Update state
     setToken(null);
     setUser(null);
-    
+
     // Redirect to login
     navigate('/login');
     toast.info('You have been logged out');
