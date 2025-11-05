@@ -1,0 +1,123 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: maturadorweb-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: whatsapp_platform
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - maturadorweb-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: maturadorweb-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - maturadorweb-network
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: maturadorweb-backend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      # Application
+      PORT: 3000
+      NODE_ENV: development
+      CORS_ORIGINS: http://localhost:5173,http://localhost:80,http://localhost:3000
+
+      # JWT
+      JWT_SECRET: whatsapp-platform-secret-dev-key-12345
+      JWT_EXPIRATION: 24h
+
+      # Database
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: whatsapp_platform
+      DB_LOGGING: false
+      DB_SSL: false
+      DB_POOL_MAX: 5
+      DB_POOL_MIN: 0
+
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ""
+
+      # Evolution API (optional - configure if you have it)
+      EVOLUTION_API_URL: http://localhost:8080
+      EVOLUTION_API_KEY: your-evolution-api-key-here
+      WEBHOOK_URL: http://backend:3000/api/v1/webhook
+
+      # DeepSeek AI (optional)
+      DEEPSEEK_API_URL: https://api.deepseek.com/v1
+      DEEPSEEK_API_KEY: your-deepseek-api-key-here
+      DEEPSEEK_MODEL: deepseek-chat
+    volumes:
+      - ./backend/uploads:/app/uploads
+      - ./backend/logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - maturadorweb-network
+
+  # Frontend (Web Interface)
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:3000/api/v1
+    container_name: maturadorweb-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - maturadorweb-network
+
+networks:
+  maturadorweb-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
