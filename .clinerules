@@ -1,0 +1,42 @@
+# Project Intelligence Rules
+
+## Critical Implementation Patterns
+```mermaid
+flowchart TD
+    State[Zustand Store] --> Wizard[Verification Wizard]
+    Wizard --> CSV[CSV Processor]
+    CSV --> Validation[Rule Engine]
+    Validation --> API[WhatsApp API]
+```
+
+## Key Development Rules
+1. **State Management**:
+   - Use Zustand for cross-component wizard state
+   - Isolate campaign state from verification flows
+   - Cache API responses in Redis with 15m TTL
+
+2. **CSV Processing**:
+   - Validate headers: phone, name, tags
+   - Batch process 1000 records/chunk
+   - Maintain processing queue in Redis
+
+3. **Error Handling**:
+   - Retry failed API calls 3x with exponential backoff
+   - Track errors in dedicated store
+   - Surface recoverable errors to UI
+
+## Component Design Principles
+1. Wizard Components:
+   - Isolate step logic in /wizard-steps
+   - Shared state via WizardContext
+   - Progress tracking via URL params
+
+2. Table Components:
+   - Virtualize rows >100 items
+   - Externalize sorting/filtering
+   - Use TanStack Table v8 patterns
+
+3. API Interactions:
+   - Axios interceptors for auth
+   - WebSocket reconnection strategy
+   - Response validation with Zod
